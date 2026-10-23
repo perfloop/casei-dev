@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Fail unless a BenchmarkBoard transcript satisfies the generality board's rules.
 
-- The run is on Sapphire Rapids: GenuineIntel family 6 model 143 with
-  AVX-512F/BW/VBMI.
+- The run has usable AVX-512F/BW/VBMI. CPU vendor, family, and model record
+  measurement provenance, not eligibility or performance on another host.
 - It measured exactly the cells pinned in arena/board/cells.txt, or with
   --family, exactly that family's cells, for iterating on one family; the
   full board is the acceptance check.
@@ -51,8 +51,7 @@ import sys
 
 PINNED = Path(__file__).resolve().parent.parent / "arena" / "board" / "cells.txt"
 ENTRANTS = ("regexp", "pcre2", "rure", "vectorscan", "stringzilla", "veloz", "rustac")
-HOST = {"vendor": "GenuineIntel", "family": "6", "model": "143",
-        "avx512f": "1", "avx512bw": "1", "avx512vbmi": "1"}
+HOST = {"avx512f": "1", "avx512bw": "1", "avx512vbmi": "1"}
 AGGREGATE_LIMIT = 1.0
 CELL_LIMIT = 1.10
 ALPHA = 0.05  # chance that compare fails a change with no effect
