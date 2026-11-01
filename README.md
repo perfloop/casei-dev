@@ -289,6 +289,78 @@ stay in the repo so the next attempt starts from evidence.
   the full field. Rebar is the external
   cross-check.
 
+## Documentation-only timing control
+
+A documentation-only comparison changes no executable search code. The Go-only
+workload below is a control for that unchanged code, not a measurement against
+the native field. It does not measure `x_vs_best`, Rust Aho-Corasick, the other
+arena rows, historical hosts, or production traffic.
+
+For this comparison, use this control first. Place the same
+`doc_multi_comparison_test.go` below in both source copies and run the same
+command on each:
+
+```sh
+go test -run '^$' -bench '^BenchmarkDocMultiN8Hit$' -benchtime=100ms -cpu=2 -count=1
+```
+
+Use one 600-second bound for the paired comparison, including its builds and
+excluded warmup. Keep the first complete samples; do not replace slow or failed
+captures. Compare `BenchmarkDocMultiN8Hit-2` in `ns/op`, lower is better, with
+a 5% regression tolerance. A bound or noisy result can remain inconclusive;
+unchanged source does not turn it into a measured preservation result.
+
+```go
+package casei
+
+import (
+    "fmt"
+    "math/rand/v2"
+    "strings"
+    "testing"
+)
+
+var docMultiMatch Match
+var docMultiOK bool
+
+func BenchmarkDocMultiN8Hit(b *testing.B) {
+    levels := []string{"DEBUG", "INFO", "INFO", "INFO", "WARN", "ERROR"}
+    services := []string{"checkout", "search", "ingest", "billing", "Gateway", "AuthZ", "replicator"}
+    messages := []string{"request completed", "cache miss", "retry scheduled", "connection reset by peer", "slow query detected", "Payment Authorized", "token refreshed", "queue depth high", "compaction finished", "TLS handshake complete", "rate limit applied"}
+    rng := rand.New(rand.NewPCG(0xCA5E1, 0xA12E9A))
+    const size = 1<<20
+    var sb strings.Builder
+    sb.Grow(size+256)
+    for sb.Len()<size {
+        fmt.Fprintf(&sb,"2026-08-04T%02d:%02d:%02d.%03dZ %s service=%s region=eu-west-%d trace=%08x%08x msg=%q latency_ms=%d\n",rng.IntN(24),rng.IntN(60),rng.IntN(60),rng.IntN(1000),levels[rng.IntN(len(levels))],services[rng.IntN(len(services))],1+rng.IntN(3),rng.Uint32(),rng.Uint32(),messages[rng.IntN(len(messages))],rng.IntN(2000))
+    }
+    logs := sb.String()[:size]
+    rng = rand.New(rand.NewPCG(7,7))
+    sb.Reset()
+    sb.Grow(size+4*len("Payment Declined"))
+    prev:=0
+    for i:=1;i<=4;i++ {
+        pos:=i*(size/5)
+        for pos>prev && logs[pos]&0xc0==0x80 { pos-- }
+        sb.WriteString(logs[prev:pos])
+        p:=[]byte("Payment Declined")
+        for j,c:=range p {
+            if rng.IntN(2)==0 { continue }
+            if 'a'<=c && c<='z' { p[j]=c-0x20 } else if 'A'<=c && c<='Z' { p[j]=c+0x20 }
+        }
+        sb.Write(p)
+        prev=pos
+    }
+    sb.WriteString(logs[prev:])
+    haystack:=sb.String()
+    m:=NewMatcher([]string{"fatal panic","segfault detected","oom killed","disk full","Payment Declined","quota exceeded","handshake failed","watchdog fired"})
+    got,ok:=m.Find(haystack)
+    if !ok || got.Pattern!=4 || got.Start!=size/5 { b.Fatalf("unexpected hit: %+v %v",got,ok) }
+    b.ResetTimer()
+    for i:=0;i<b.N;i++ { docMultiMatch,docMultiOK=m.Find(haystack) }
+}
+```
+
 ## Read next
 
 - [How it works](HOW_IT_WORKS.md)
