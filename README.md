@@ -301,7 +301,7 @@ For this comparison, use this control first. Place the same
 command on each:
 
 ```sh
-go test -run '^$' -bench '^BenchmarkDocMultiN8Hit$' -benchtime=100ms -cpu=2 -count=1
+go test -run '^$' -bench '^BenchmarkDocMultiN8Hit$' -benchtime=1s -cpu=2 -count=1
 ```
 
 Use one 600-second bound for the paired comparison, including its builds and
